@@ -1,0 +1,79 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Leemos los df
+```{r}
+df_train = read.csv('data/train.csv')
+df_train$Date = as.Date(df_train$Date)
+df_test = read.csv('data/test.csv')
+df_store = read.csv('data/store.csv')
+head(df_store)
+head(df_train)
+head(df_test)
+```
+
+# Store con minima distancia
+```{r}
+min(df_store[!is.na(df_store$CompetitionDistance),'CompetitionDistance'])
+```
+
+```{r}
+df_store[df_store$CompetitionDistance==20,]
+```
+
+
+# Obtenemos las stores de test
+```{r}
+stores_test = unique(df_test$Store)
+```
+
+
+#Filtramos del DF las stores de test
+```{r}
+df_train_filtered = df_train[df_train$Store %in% stores_test, ]
+head(df_train_filtered)
+```
+
+
+# Filtramos la tienda 1
+```{r}
+df_train_tienda_1 = df_train_filtered[df_train_filtered$Store==1,]
+head(df_train_tienda_1)
+```
+
+# Filtramos la tienda 3
+```{r}
+df_train_tienda_3 = df_train_filtered[df_train_filtered$Store==3,]
+head(df_train_tienda_3)
+```
+
+# Chequeo de la cantidad de días con venta en el día domingo
+```{r}
+nrow(df_train_filtered[(df_train_filtered$DayOfWeek==7),])
+nrow(df_train_filtered[(df_train_filtered$DayOfWeek==7)&(df_train_filtered$Sales==0),])
+```
+
+# Correlación cruzada con convolve de la ventas tienda 1, y clientes
+```{r}
+ventas_clientes = convolve(df_train_tienda_1$Sales, df_train_tienda_1$Customers, conj = TRUE)
+plot(df_train_tienda_1$Date, ventas_clientes , type="l")
+```
+
+# Correlación cruzada Clientes Ventas
+```{r}
+ccf(df_train_tienda_1$Customers, df_train_tienda_1$Sales,lag.max = 300)
+```
+
+
+# Autocorrelación de la serie de ventas
+```{r}
+acf(df_train_tienda_1$Sales, lag.max = length(df_train_tienda_1$Sales))
+```
+# Correlación cruzada tienda 1 y 3
+```{r}
+plot(df_train_tienda_1$Date, df_train_tienda_1$Sales, type ='l' ,main= 'Ventas Tienda 1 y 3', xlab='Fecha', ylab='Ventas')
+lines(df_train_tienda_1$Date, df_train_tienda_3$Sales, col = 'red')
+ccf(df_train_tienda_1$Sales,df_train_tienda_3$Sales)
+```
