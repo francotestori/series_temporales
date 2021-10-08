@@ -1,10 +1,10 @@
 jupyterlab
 notebook
 scikit-learn
+pandas
 numpy
 matplotlib
 seaborn
-# hay que usar estas versiones para que prophet funcione bien
-pandas==1.0.5
-pystan==2.17.1.0
-fbprophet==0.6
+skforecast
+pystan==2.19.1.1
+fbprophet
