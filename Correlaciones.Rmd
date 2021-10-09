@@ -77,3 +77,362 @@ plot(df_train_tienda_1$Date, df_train_tienda_1$Sales, type ='l' ,main= 'Ventas T
 lines(df_train_tienda_1$Date, df_train_tienda_3$Sales, col = 'red')
 ccf(df_train_tienda_1$Sales,df_train_tienda_3$Sales)
 ```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(tsibble)
+library(feasts)
+
+y <- tsibble(
+  Date = df_train_tienda_1$Date,
+  Sales = df_train_tienda_1$Sales,
+  index = Date
+)
+autoplot(y,Sales) +
+  labs(title = "Ventas diarias Tienda 1",
+       y = "Sales")
+
+```
+
+#Filtrando cuando se encuentra cerrado
+```{r}
+melsyd_economy <- df_train_filtered %>%
+  filter(Open == 1, Store == 1) %>%
+  as_tsibble(index = Date)
+
+autoplot(melsyd_economy, Sales) +
+  labs(title = "Sales")
+```
+
+```{r}
+melsyd_economy <- df_train_filtered %>%
+  filter(Store == 1) %>%
+  mutate(Sales = ifelse(Open == 1, Sales, NA),
+         Customers = ifelse(Open == 1, Customers, NA),
+         Promo = ifelse(Open == 1, Promo, NA),
+         StateHoliday = ifelse(Open == 1, StateHoliday, NA),
+         SchoolHoliday = ifelse(Open == 1, SchoolHoliday, NA),
+         ) %>%
+  as_tsibble(index = Date)
+```
+
+# Se puede observar cierta estacionalidad a lo largo del año
+```{r}
+melsyd_economy %>%
+  gg_season(Sales, labels = "both") +
+  labs(title = "Seasonal plot")
+```
+
+# Estacionalidad semanal
+```{r}
+melsyd_economy %>% gg_season(Sales, period = "week") +
+  theme(legend.position = "none") +
+  labs(title="Weekly Seasonality")
+```
+
+# Estacionalidad anual
+```{r}
+melsyd_economy %>% gg_season(Sales, period = "year") +
+  theme(legend.position = "none") +
+  labs(title="Year Seasonality")
+```
+
+#Subseries Plot, estacionalidad dentro de la semana
+```{r}
+melsyd_economy %>%
+  gg_subseries(Sales,period = 'week') +
+  labs(title = "Venta por día de la semana"
+  )
+```
+
+
+```{r}
+melsyd_economy %>%
+  autoplot(Customers) +
+  labs(
+    title = "Clientes"
+  )
+```
+
+# Scatter Plot Clientes y Ventas
+```{r}
+melsyd_economy %>%
+  ggplot(aes(x = Customers, y = Sales)) +
+  geom_point()
+```
+
+# Alta correlación entre clientes y ventas
+```{r}
+cor(df_train_tienda_1$Customers, df_train_tienda_1$Sales)
+cor(df_train_tienda_1$Customers, df_train_tienda_1$Sales, method = 'spearman')
+```
+# Lag Plots
+# Scatter plot contra diferentes lags, a medida que nos alejamos en el tiempo, se encuentran menos relacionadas
+```{r}
+melsyd_economy %>%
+  gg_lag(Sales, geom = "point") +
+  labs(x = "lag(Sales, k)")
+```
+
+
+# Scatter Plot para diferentes lags
+```{r}
+melsyd_economy %>%
+  gg_lag(Sales, geom = "point", lags = c(1,2,3,7,14,30,365)   ) +
+  labs(x = "lag(Sales, k)")
+```
+
+# Autocorrelacion 40 lags
+```{r}
+melsyd_economy %>%
+  ACF(Sales, lag_max = 40, na.action = na.pass) %>%
+  autoplot() + labs(title="Sales")
+```
+
+
+# Autocorrelacion 400 lags
+```{r}
+melsyd_economy %>%
+  ACF(Sales, lag_max = 400, na.action = na.pass) %>%
+  autoplot() + labs(title="Sales")
+```
+# Para lags pequeños tenemos una alta correlación, cada 7 días se ven picos, lo que indica que hay cierta estacionalidad
+# También vemos un pico grande aproximadamente al año
+# Cuando hay tendencia, suele haber una autocorrelación alta y positiva en los lags pequeños, valores cercanos en tiempo, cercanos también en valor
+# Cuando la data es estacional, las autocorrelaciones son altas para los lags estacionales (en múltiplos de dichos lags)
+
+
+# Descomponemos la serie en Tendencia, Estacionalidad Anual y Estacionalidad Semanal
+```{r}
+melsyd_economy_2 <- df_train_filtered %>%
+  filter(Store == 1) %>%
+  # mutate(Sales = ifelse(Open == 1, Sales, NA),
+  #        Customers = ifelse(Open == 1, Customers, NA),
+  #        Promo = ifelse(Open == 1, Promo, NA),
+  #        StateHoliday = ifelse(Open == 1, StateHoliday, NA),
+  #        SchoolHoliday = ifelse(Open == 1, SchoolHoliday, NA),
+  #        ) %>%
+  as_tsibble(index = Date)
+
+dcmp <- melsyd_economy_2 %>%
+  model(stl = STL(Sales))
+components(dcmp)
+melsyd_economy_2 %>% autoplot(Sales)
+components(dcmp) %>% autoplot()
+
+```
+
+
+```{r}
+components(dcmp) %>%
+  as_tsibble() %>%
+  autoplot(Sales, colour="gray") +
+  geom_line(aes(y=trend), colour = "#D55E00") +
+  labs(
+
+    title = "Sales"
+  )
+```
+
+# Datos con estacionalidad ajustada
+```{r}
+components(dcmp) %>%
+  as_tsibble() %>%
+  autoplot(Sales, colour = "gray") +
+  geom_line(aes(y=season_adjust), colour = "#0072B2") +
+  labs(
+       title = "Sales")
+```
+
+
+# Moving Average 7
+```{r}
+# Considerando la serie completa
+melsyd_economy_3 <- melsyd_economy_2 %>%
+  mutate(
+    `7-MA` = slider::slide_dbl(Sales, mean,
+                .before = 3, .after = 3, .complete = TRUE)
+  )
+
+melsyd_economy_3 %>%
+  autoplot(Sales) +
+  geom_line(aes(y = `7-MA`), colour = "#D55E00") +
+  labs(y = "% of GDP",
+       title = "Total Australian exports") +
+  guides(colour = guide_legend(title = "series"))
+
+
+# Filtrando cuando se encuentra cerrado
+melsyd_economy_3 <- melsyd_economy %>%
+  mutate(
+    `7-MA` = slider::slide_dbl(Sales, mean,
+                .before = 3, .after = 3, .complete = TRUE)
+  )
+
+
+melsyd_economy_3 %>%
+  autoplot(Sales) +
+  geom_line(aes(y = `7-MA`), colour = "#D55E00") +
+  labs(y = "% of GDP",
+       title = "Total Australian exports") +
+  guides(colour = guide_legend(title = "series"))
+
+```
+
+
+# Se puede calcular tendencia a partir de dos filtros moving average, en este caso, uno de 7 para la semana, y despues uno de 52 para el año  (*) habría que chequearlo...
+```{r}
+melsyd_economy_4 <- melsyd_economy_2 %>%
+  mutate(
+    `12-MA` = slider::slide_dbl(Sales, mean,
+                .before = 3, .after = 3, .complete = TRUE),
+    `2x12-MA` = slider::slide_dbl(`12-MA`, mean,
+                .before = 26, .after = 26, .complete = TRUE)
+  )
+melsyd_economy_4 %>%
+  autoplot(Sales, colour = "gray") +
+  geom_line(aes(y = `2x12-MA`), colour = "#D55E00") +
+  labs(y = "Persons (thousands)",
+       title = "Total employment in US retail")
+```
+
+# Descomposición clásica
+```{r}
+melsyd_economy_2 %>%
+  model(
+    classical_decomposition(Sales, type = "additive")
+    # classical_decomposition(Sales~season(365), type = "additive")
+  ) %>%
+  components() %>%
+  autoplot() +
+  labs(title = "Classical additive decomposition of total
+                  US retail employment")
+```
+
+# Descomposiciones clásicas
+```{r}
+# install.packages("seasonal")
+library(seasonal)
+# No funca
+# x11_dcmp <- melsyd_economy_2[,c('Date','Sales')] %>%
+#   model(x11 = X_13ARIMA_SEATS(Sales ~ x11(na.action = seasonal::na.x13))) %>%
+#   components()
+# autoplot(x11_dcmp) +
+#   labs(title =
+#     "Decomposition of total US retail employment using X-11.")
+# 
+# sum(is.na(melsyd_economy_2$Sales))
+```
+
+# STL Decomposition, varias ventajas, lo único, no considera estacionalidad intradiaria o dentro del calendario
+```{r}
+melsyd_economy_2 %>%
+  model(
+    STL(Sales ~ trend(window = 360) +
+                   season(window = "periodic"),
+    robust = TRUE)) %>%
+  components() %>%
+  autoplot()
+```
+# STL Features
+```{r}
+melsyd_economy_2 %>%
+  features(Sales, feat_stl)
+```
+
+# Models
+
+# Filter Data for train
+```{r}
+df_train_tienda_1_train <- melsyd_economy_2 %>%
+  filter(Date<'2015-01-01')
+```
+
+
+```{r}
+# install.packages('fable')
+library(fable)
+```
+
+
+# Mean
+```{r}
+df_train_tienda_1_train %>% model(MEAN(Sales))
+```
+# Naive last value
+```{r}
+df_train_tienda_1_train %>% model(NAIVE(Sales))
+```
+
+# Naive last cycle (seasonal) Year
+```{r}
+df_train_tienda_1_train %>% model(SNAIVE(Sales ~ lag("year")))
+```
+
+# Naive last cycle (seasonal) Week
+```{r}
+df_train_tienda_1_train %>% model(SNAIVE(Sales ~ lag("week")))
+```
+
+# Drift
+```{r}
+df_train_tienda_1_train %>% model(RW(Sales ~ drift()))
+```
+
+# Different Models
+```{r}
+# Set training data from 1992 to 2006
+# train <- aus_production %>%
+#   filter_index("1992 Q1" ~ "2006 Q4")
+# Fit the models
+beer_fit <- df_train_tienda_1_train %>%
+  model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales)
+  )
+# Generate forecasts for 14 quarters
+beer_fc <- beer_fit %>% forecast(h = 42)
+# Plot forecasts against actual values
+beer_fc %>%
+  autoplot(df_train_tienda_1_train, level = NULL) +
+  autolayer( df_train_tienda_1_train %>%
+    filter(Date>="2015-01-01") %>%
+      select(Sales),
+    colour = "black"
+  ) +
+  labs(
+    title = "Forecasts for Sales"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Different Models
+```{r}
+# Set training data from 1992 to 2006
+# train <- aus_production %>%
+#   filter_index("1992 Q1" ~ "2006 Q4")
+# Fit the models
+beer_fit <- melsyd_economy %>%
+  model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales ~ lag("week"))
+  )
+# Generate forecasts for 14 quarters
+beer_fc <- beer_fit %>% forecast(h = 42)
+# Plot forecasts against actual values
+beer_fc %>%
+  autoplot(melsyd_economy, level = NULL) +
+  autolayer( melsyd_economy %>%
+    filter(Date>="2015-01-01") %>%
+      select(Sales),
+    colour = "black"
+  ) +
+  labs(
+    title = "Forecasts for Sales"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
