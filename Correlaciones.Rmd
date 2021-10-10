@@ -342,7 +342,7 @@ melsyd_economy_2 %>%
   features(Sales, feat_stl)
 ```
 
-# Models
+# BenchMark Models
 
 # Filter Data for train
 ```{r}
@@ -381,7 +381,7 @@ df_train_tienda_1_train %>% model(SNAIVE(Sales ~ lag("week")))
 df_train_tienda_1_train %>% model(RW(Sales ~ drift()))
 ```
 
-# Different Models
+# Different Models including 0
 ```{r}
 # Set training data from 1992 to 2006
 # train <- aus_production %>%
@@ -409,7 +409,7 @@ beer_fc %>%
   guides(colour = guide_legend(title = "Forecast"))
 ```
 
-# Different Models
+# Different Models Zeros as Null
 ```{r}
 # Set training data from 1992 to 2006
 # train <- aus_production %>%
@@ -417,15 +417,20 @@ beer_fc %>%
 # Fit the models
 beer_fit <- melsyd_economy %>%
   model(
+    # Actual_Sales = Sales,
     Mean = MEAN(Sales),
     `Naïve` = NAIVE(Sales),
-    `Seasonal naïve` = SNAIVE(Sales ~ lag("week"))
-  )
+    `Seasonal naïve (week)` = SNAIVE(Sales ~ lag("week")),
+    `Seasonal naïve (year)` = SNAIVE(Sales ~ lag("year")),
+    
+                              )
 # Generate forecasts for 14 quarters
 beer_fc <- beer_fit %>% forecast(h = 42)
 # Plot forecasts against actual values
 beer_fc %>%
-  autoplot(melsyd_economy, level = NULL) +
+  autoplot(melsyd_economy 
+            # %>% filter(Date>="2014-10-20")
+             , level = NULL) +
   autolayer( melsyd_economy %>%
     filter(Date>="2015-01-01") %>%
       select(Sales),
@@ -436,3 +441,273 @@ beer_fc %>%
   ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
+
+# Simple Models
+```{r}
+# Set training data from 1992 to 2006
+# train <- aus_production %>%
+#   filter_index("1992 Q1" ~ "2006 Q4")
+# Fit the models
+beer_fit <- melsyd_economy %>%
+  filter(Date<"2015-01-01") %>%
+  model(
+    # Actual_Sales = Sales,
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve (week)` = SNAIVE(Sales ~ lag("week")),
+    # `Seasonal naïve (year)` = SNAIVE(Sales ~ lag("year")),
+    
+                              )
+# Generate forecasts for 14 quarters
+beer_fc <- beer_fit %>% forecast(h = 42)
+# Plot forecasts against actual values
+beer_fc %>%
+  autoplot(melsyd_economy 
+            %>% filter(Date>="2014-10-20")
+             , level = NULL) +
+  autolayer( melsyd_economy %>%
+    filter(Date>="2015-01-01") %>%
+      select(Sales),
+    colour = "black"
+  ) +
+  labs(
+    title = "Forecasts for Sales"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Ajustando el formato
+```{r}
+df_train_tienda_1 <- df_train_tienda_1 %>%
+  as_tsibble(index = Date) 
+```
+
+# Simple Models
+```{r}
+# Set training data from 1992 to 2006
+# train <- aus_production %>%
+#   filter_index("1992 Q1" ~ "2006 Q4")
+# Fit the models
+beer_fit <- df_train_tienda_1 %>%
+  filter(Date<"2015-01-01") %>%
+  model(
+    # Actual_Sales = Sales,
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve (week)` = SNAIVE(Sales ~ lag("week")),
+    # `Seasonal naïve (year)` = SNAIVE(Sales ~ lag("year")),
+    
+                              )
+# Generate forecasts for 14 quarters
+beer_fc <- beer_fit %>% forecast(h = 42)
+# Plot forecasts against actual values
+beer_fc %>%
+  autoplot(df_train_tienda_1 
+            %>% filter(Date>="2014-10-20")
+             , level = NULL) +
+  autolayer( df_train_tienda_1 %>%
+    filter(Date>="2015-01-01") %>%
+      select(Sales),
+    colour = "black"
+  ) +
+  labs(
+    title = "Forecasts for Sales"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Para ver los valoes del fit, residuos y residuos innovados (cambio de escala)
+```{r}
+augment(beer_fit)
+```
+
+<!-- 5.4 Residual diagnostics -->
+<!-- A good forecasting method will yield innovation residuals with the following properties: -->
+
+<!-- The innovation residuals are uncorrelated. If there are correlations between innovation residuals, then there is information left in the residuals which should be used in computing forecasts. -->
+<!-- The innovation residuals have zero mean. If they have a mean other than zero, then the forecasts are biased. -->
+
+<!-- In addition to these essential properties, it is useful (but not necessary) for the residuals to also have the following two properties. -->
+
+<!-- The innovation residuals have constant variance. This is known as “homoscedasticity”. -->
+<!-- The innovation residuals are normally distributed. -->
+
+# Residuos
+```{r}
+aug <- df_train_tienda_1 %>%
+  model(SNAIVE(Sales ~ lag("week"))) %>%
+  augment()
+autoplot(aug, .innov) +
+  labs(title = "Residuals from the naïve method")
+```
+
+# Histograma Residuos
+```{r}
+aug %>%
+  ggplot(aes(x = .innov)) +
+  geom_histogram() +
+  labs(title = "Histogram of residuals")
+```
+
+# Autocorrelacion de los residuos
+```{r}
+aug %>%
+  ACF(.innov) %>%
+  autoplot() +
+  labs(title = "Residuals from the naïve method")
+```
+# Se pueden ver algunas autocorrelaciones altas.
+
+# Tres gráficos en 1, Residuos a lo largo del tiempo, autocorrelación e histograma
+```{r}
+df_train_tienda_1 %>%
+  model(SNAIVE(Sales ~ lag("week"))) %>%
+  gg_tsresiduals()
+```
+
+# Intervalos de predicción
+```{r}
+df_train_tienda_1 %>%
+  model(SNAIVE(Sales ~ lag("week"))) %>%
+  forecast(h = 42) %>%
+  autoplot(df_train_tienda_1) +
+  labs(title="Google daily closing stock price", y="$US" )
+```
+
+# Intervalos de predicción
+```{r}
+melsyd_economy %>%
+  model(SNAIVE(Sales ~ lag("week"))) %>%
+  forecast(h = 42) %>%
+  autoplot(melsyd_economy) +
+  labs(title="Google daily closing stock price", y="$US" )
+```
+
+# Intervalos de predicción
+```{r}
+melsyd_economy %>%
+  model(NAIVE(Sales)) %>%
+  forecast(h = 42) %>%
+  autoplot(melsyd_economy) +
+  labs(title="Google daily closing stock price", y="$US" )
+```
+
+# Forecast for the last 42 days (6 weeks)
+```{r}
+recent_production <- melsyd_economy %>%
+  slice(n()-42:0)
+beer_train <- melsyd_economy %>%
+  slice(1:(n()-43))
+
+beer_fit <- beer_train %>%
+  model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales),
+    Drift = RW(Sales ~ drift())
+  )
+
+beer_fc <- beer_fit %>%
+  forecast(h = 42)
+
+beer_fc %>%
+  autoplot(
+    melsyd_economy %>% slice(n()-134:0),
+    level = NULL
+  ) +
+  labs(
+    y = "Megalitres",
+    title = "Forecasts for quarterly beer production"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Accuracy metrics
+```{r}
+accuracy(beer_fc, recent_production)
+```
+
+
+# Forecast for the last 42 days (6 weeks)
+```{r}
+recent_production <- melsyd_economy_2 %>%
+  slice(n()-42:0)
+beer_train <- melsyd_economy_2 %>%
+  slice(1:(n()-43))
+
+beer_fit <- beer_train %>%
+  model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales),
+    Drift = RW(Sales ~ drift())
+  )
+
+beer_fc <- beer_fit %>%
+  forecast(h = 42)
+
+beer_fc %>%
+  autoplot(
+    melsyd_economy_2 %>% slice(n()-134:0),
+    level = NULL
+  ) +
+  labs(
+    y = "Megalitres",
+    title = "Forecasts for quarterly beer production"
+  ) +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Accuracy metrics evaluación del modelo
+```{r}
+accuracy(beer_fc, recent_production)
+```
+
+# Walk forward validation (CV cross validation)
+
+# Create Training Test Partitions
+```{r}
+# Time series cross-validation accuracy
+google_2015_tr <- melsyd_economy_2 %>%
+  stretch_tsibble(.init = 731, .step = 42) %>%
+  relocate(Date, .id)
+google_2015_tr
+```
+
+# Cross validation
+```{r}
+rbind(
+# TSCV accuracy
+google_2015_tr %>%
+  model(RW(Sales ~ drift())) %>%
+  forecast(h = 1) %>%
+  accuracy(melsyd_economy_2)
+,
+# Training set accuracy
+melsyd_economy_2 %>%
+  model(RW(Sales ~ drift())) %>%
+  accuracy()
+)
+```
+
+# Cross validation
+```{r}
+
+# TSCV accuracy
+rbind(
+google_2015_tr %>%
+  model(SNAIVE(Sales)) %>%
+  forecast(h = 42) %>%
+  accuracy(melsyd_economy_2)
+,
+# Training set accuracy
+melsyd_economy_2 %>%
+  model(SNAIVE(Sales)) %>%
+  accuracy()
+)
+```
+
+```{r}
+
+```
+
