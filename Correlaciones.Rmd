@@ -172,9 +172,16 @@ ggplot(melsyd_economy %>%
   filter(Open==1) %>%
     mutate(DayOfMonth = as.factor(lubridate::day(Date))),  aes(x= DayOfMonth, y=Sales, color = DayOfMonth)) + 
   geom_boxplot()
-
 ```
 
+# Días para que termine el mes
+```{r}
+ggplot(melsyd_economy %>%
+  filter(Open==1) %>%
+    mutate(DayToEndOfMonth = as.factor(lubridate::days_in_month(Date) - lubridate::day(Date))),  aes(x= DayToEndOfMonth, y=Sales, color = DayToEndOfMonth)) + 
+  geom_boxplot()
+```
+# Cuando faltan pocos días para que termine el mes la venta es alta.
 
 # Boxplots Efecto de vacaciones de escuela
 ```{r}
@@ -706,7 +713,7 @@ accuracy(beer_fc, recent_production)
 ```{r}
 # Time series cross-validation accuracy
 google_2015_tr <- melsyd_economy_2 %>%
-  stretch_tsibble(.init = 731, .step = 42) %>%
+  stretch_tsibble(.init = 731, .step = 42) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
   relocate(Date, .id)
 google_2015_tr
 ```
@@ -801,7 +808,7 @@ fc <- fit %>%
 ```{r}
 fc %>%
   autoplot(melsyd_economy_2 %>%
-             slice(n()-126:0)) 
+             slice(n()-126:0)) +
   labs(title="Exponential Smoothing") +
   guides(colour = "none")
 ```
@@ -988,7 +995,80 @@ melsyd_economy_2 %>%
 
 
 ```{r}
+# install.packages('fable.prophet')
+library(fable.prophet)
 
+train <- melsyd_economy_2 %>%
+  filter(Date<"2015-06-19")
+fit <- train %>%
+  model(
+    arima = ARIMA(Sales),
+    ets = ETS(Sales),
+    prophet = prophet(Sales ~ season(type = "multiplicative"))
+  )
 ```
+
+```{r}
+fc <- fit %>% forecast(h = 42)
+fc %>% autoplot(melsyd_economy_2 %>%
+                  slice(n()-134:0)
+                  )
+```
+
+# Neural Nets (Redes Neuronales)
+```{r}
+melsyd_economy_2 %>%
+  filter(Date<"2015-06-19") %>%
+  model(NNETAR(Sales)) %>%
+  forecast(h = 42, times = 100) %>% # El parámetro times permite correr distintas simulaciones, cambian los intervalos de confianza
+  autoplot(melsyd_economy_2 %>%
+                  slice(n()-134:0)) +
+  labs(x = "Year", y = "Counts",
+       title = "Yearly sunspots")
+```
+
+# Seleccion del mejor modelo
+
+# Walk forward validation (CV cross validation)
+
+# Create Training - Test Partitions
+```{r}
+# Time series cross-validation accuracy
+df_cv <- melsyd_economy_2 %>%
+  stretch_tsibble(.init = 731, .step = 42) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  relocate(Date, .id)
+
+
+print(paste("Cantidad de folds: ", max(df_cv$.id)))
+df_cv
+```
+
+
+# Cross validation
+```{r}
+rbind(
+# TSCV accuracy
+df_cv %>%
+    model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales),
+    Drift = RW(Sales ~ drift()),
+    ETS = ETS(Sales),
+    Prophet = prophet(Sales ~ season(type = "multiplicative")),
+    # Redes_Neuronales = model(NNETAR(Sales))
+  )
+ %>%
+  forecast(h = 42) %>%
+  accuracy(melsyd_economy_2 %>%
+             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+# ,
+# # Training set accuracy
+# melsyd_economy_2 %>%
+#   model(RW(Sales ~ drift())) %>%
+#   accuracy()
+)
+```
+
 
 
