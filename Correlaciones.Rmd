@@ -5,6 +5,7 @@ output: html_notebook
 
 # Leemos los df
 ```{r}
+# install.packages('tidyverse')
 df_train = read.csv('data/train.csv')
 df_train$Date = as.Date(df_train$Date)
 df_test = read.csv('data/test.csv')
@@ -132,6 +133,15 @@ melsyd_economy %>% gg_season(Sales, period = "week") +
   labs(title="Weekly Seasonality")
 ```
 
+# Boxplots estacionalidad semanal
+```{r}
+ggplot(melsyd_economy %>%
+  filter(Open==1) %>%
+    mutate(DayOfWeek = as.factor(DayOfWeek)),  aes(x= DayOfWeek, y=Sales, color = DayOfWeek)) + 
+  geom_boxplot()
+```
+# La mediana y los extramos de la caja se comportan de manera distinta dependiendo el día de la semana
+
 # Estacionalidad anual
 ```{r}
 melsyd_economy %>% gg_season(Sales, period = "year") +
@@ -147,6 +157,33 @@ melsyd_economy %>%
   )
 ```
 
+
+# Venta a lo largo del día del mes
+```{r}
+melsyd_economy %>%
+  gg_subseries(Sales,period = 'month') +
+  labs(title = "Venta por día del mes"
+  )
+```
+
+# Boxplot Estacionalidad a lo largo del mes
+```{r}
+ggplot(melsyd_economy %>%
+  filter(Open==1) %>%
+    mutate(DayOfMonth = as.factor(lubridate::day(Date))),  aes(x= DayOfMonth, y=Sales, color = DayOfMonth)) + 
+  geom_boxplot()
+
+```
+
+
+# Boxplots Efecto de vacaciones de escuela
+```{r}
+ggplot(melsyd_economy %>%
+  filter(Open==1) %>%
+    mutate(SchoolHoliday = as.factor(SchoolHoliday)),  aes(x= SchoolHoliday, y=Sales, color = SchoolHoliday)) + 
+  geom_boxplot()
+```
+# La mediana parece ser más baja, no obstante hay mucho solapamiento
 
 ```{r}
 melsyd_economy %>%
@@ -707,7 +744,251 @@ melsyd_economy_2 %>%
 )
 ```
 
+# Regresion Lineal
+```{r}
+fit_beer <- recent_production %>%
+  model(TSLM(Sales ~ trend() + season()))
+report(fit_beer)
+```
+
+# Regresion Lineal
+```{r}
+melsyd_economy_rl = melsyd_economy_2 %>%
+  filter(Date<"2015-06-19")
+melsyd_economy_rl$DayOfWeek = as.factor(melsyd_economy_rl$DayOfWeek)
+
+fit_beer <- melsyd_economy_rl %>%
+  model(TSLM(Sales ~ Open * (DayOfWeek + Date) - Open - DayOfWeek - Date))
+  # model(TSLM(Sales ~ Date))
+report(fit_beer)
+```
+
+```{r}
+recent_production <- melsyd_economy_2 %>%
+  slice(n()-42:0)
+recent_production$DayOfWeek = as.factor(recent_production$DayOfWeek)
+
+fc_beer <- forecast(fit_beer, new_data = recent_production)
+
+fc_beer %>%
+  autoplot(recent_production) +
+  labs(
+    title = "Sales Forecast using regression"
+  )
+```
+
+# Métricas del modelo
+```{r}
+accuracy(fc_beer, recent_production %>%
+           filter(Open==1) )
+```
+
+
+# Exponential Smoothing
+```{r}
+# # install.packages('forecast')
+# library(Rcpp)
+# library(forecast)
+# # Estimate parameters
+fit <- melsyd_economy_2 %>%
+  filter(Date<"2015-06-19") %>%
+  model(fable::ETS(Sales ~ error("A") + trend("N") + season("N")))
+fc <- fit %>%
+  forecast(h = 42)
+```
+
+# Plot
+```{r}
+fc %>%
+  autoplot(melsyd_economy_2 %>%
+             slice(n()-126:0)) 
+  labs(title="Exponential Smoothing") +
+  guides(colour = "none")
+```
+
+# Métricas del modelo
+```{r}
+accuracy(fc, recent_production %>%
+           filter(Open==1) )
+```
+
+# Modelos con tendencia y estacionalidad aditiva y multiplicativa
+```{r}
+aus_holidays <- melsyd_economy_2 %>%
+  filter(Date<"2015-06-19") %>%
+  summarise(Sales = sum(Sales)/1e3)
+
+fit <- aus_holidays %>%
+  model(
+    additive = ETS(Sales ~ error("A") + trend("A") +
+                                                season("A")),
+    multiplicative = ETS(Sales ~ error("M") + trend("A") +
+                                                season("M"))
+  )
+fc <- fit %>% forecast(h = 42)
+fc %>%
+  autoplot(aus_holidays %>%
+           slice(n()-126:0), level = NULL) +
+  labs(title="Sales, Holts Winters - Additive and Multiplicative") +
+  guides(colour = guide_legend(title = "Forecast"))
+```
+
+# Métricas del modelo
+```{r}
+accuracy(fc, recent_production %>%
+           mutate(Sales = Sales/1e3) %>%
+           filter(Open==1) )
+```
+
+# Efecto Multiplicativo
+```{r}
+sth_cross_ped <- melsyd_economy_2 %>%
+  summarise(Sales = sum(Sales)/1e3)
+
+sth_cross_ped %>%
+  filter(Date<"2015-06-19") %>%
+  model(
+    hw = ETS(Sales ~ error("M") + trend("Ad") + season("M"))
+  ) %>%
+  forecast(h = 42) %>%
+  autoplot(sth_cross_ped %>% slice(n()-126:0)) +
+  labs(title = "Sales Holts - Winters Multiplicativo")
+```
+
+# Descomposición del modelo Holts-Winters en Nivel, Tendencia, Estacionalidad
+```{r}
+dcmp <- melsyd_economy_2 %>%
+  summarise(Sales = sum(Sales)/1e3) %>%
+    model(
+    hw = ETS(Sales ~ error("M") + trend("Ad") + season("M"))
+  ) 
+components(dcmp)
+melsyd_economy_2 %>% autoplot(Sales)
+components(dcmp) %>% autoplot()
+```
+
+
+# Descomposición del modelo Tendancia y Estacionalidad aditivas en Nivel, Tendencia, Estacionalidad
+```{r}
+dcmp <- melsyd_economy_2 %>%
+  summarise(Sales = sum(Sales)/1e3) %>%
+    model(
+    hw = ETS(Sales ~ error("A") + trend("Ad") + season("A"))
+  ) 
+components(dcmp)
+melsyd_economy_2 %>% autoplot(Sales)
+components(dcmp) %>% autoplot()
+```
+
+# ARIMA
+```{r}
+melsyd_economy_2 %>%
+  mutate(diff_sales = difference(Sales)) %>%
+  features(diff_sales, ljung_box, lag = 10)
+```
+
+```{r}
+melsyd_economy_2 %>%
+  summarise(Sales = sum(Sales)/1e6) %>%
+  transmute(
+    `Sales ($million)` = Sales,
+    `Log sales` = log(Sales),
+    `Annual change in log sales` = difference(log(Sales), 365),
+    `Doubly differenced log sales` =
+                     difference(difference(log(Sales), 365), 1)
+  ) %>%
+  pivot_longer(-Date, names_to="Type", values_to="Sales") %>%
+  mutate(
+    Type = factor(Type, levels = c(
+      "Sales ($million)",
+      "Log sales",
+      "Annual change in log sales",
+      "Doubly differenced log sales"))
+  ) %>%
+  ggplot(aes(x = Date, y = Sales)) +
+  geom_line() +
+  facet_grid(vars(Type), scales = "free_y") +
+  labs(title = "Corticosteroid drug sales", y = NULL)
+```
+
+# Test de estacionariedad
+```{r}
+melsyd_economy_2 %>%
+  features(Sales, unitroot_kpss)
+```
+
+```{r}
+melsyd_economy_2 %>%
+mutate(diff_close = difference(Sales, 365)) %>%
+features(diff_close, unitroot_kpss)
+```
+
+```{r}
+melsyd_economy_2 %>%
+mutate(diff_close = difference(Sales, 7)) %>%
+features(diff_close, unitroot_kpss)
+```
+
+```{r}
+melsyd_economy_2 %>%
+  features(Sales, unitroot_ndiffs)
+```
+
+# ARIMA con estacionalidad
+
+# Estacionalidad Anual
+```{r}
+melsyd_economy_2 %>%
+  gg_tsdisplay(difference(Sales, 365),
+               plot_type='partial', lag=36) +
+  labs(title="Seasonally differenced", y="")
+```
+
+# Estacionalidad semanal
+```{r}
+melsyd_economy_2 %>%
+  gg_tsdisplay(difference(Sales, 7),
+               plot_type='partial', lag=36) +
+  labs(title="Seasonally differenced", y="")
+```
+
+# Restando diferencia de orden 1 adicionalmente
+```{r}
+melsyd_economy_2 %>%
+  gg_tsdisplay(difference(Sales, 28) %>% difference(),
+               plot_type='partial', lag=36) +
+  labs(title = "Double differenced", y="")
+```
+
+# Removiendo Nulos
+
+# Estacionalidad Anual
+```{r}
+melsyd_economy %>%
+  gg_tsdisplay(difference(Sales, 365),
+               plot_type='partial', lag=36) +
+  labs(title="Seasonally differenced", y="")
+```
+
+# Estacionalidad semanal
+```{r}
+melsyd_economy %>%
+  gg_tsdisplay(difference(Sales, 7),
+               plot_type='partial', lag=36) +
+  labs(title="Seasonally differenced", y="")
+```
+
+# Restando diferencia de orden 1 adicionalmente
+```{r}
+melsyd_economy_2 %>%
+  gg_tsdisplay(difference(Sales, 28) %>% difference(),
+               plot_type='partial', lag=36) +
+  labs(title = "Double differenced", y="")
+```
+
+
 ```{r}
 
 ```
+
 
