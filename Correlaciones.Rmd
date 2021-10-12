@@ -1031,18 +1031,18 @@ melsyd_economy_2 %>%
 
 # Walk forward validation (CV cross validation)
 
-# Create Training - Test Partitions
+# Create Training - Val Partitions para WFV
 ```{r}
 # Time series cross-validation accuracy
 df_cv <- melsyd_economy_2 %>%
-  stretch_tsibble(.init = 731, .step = 42) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  slice(0:(n()-85)) %>%
+  stretch_tsibble(.init = 731, .step = 11) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
   relocate(Date, .id)
 
 
 print(paste("Cantidad de folds: ", max(df_cv$.id)))
 df_cv
 ```
-
 
 # Cross validation
 ```{r}
@@ -1055,7 +1055,8 @@ df_cv %>%
     `Seasonal naïve` = SNAIVE(Sales),
     Drift = RW(Sales ~ drift()),
     ETS = ETS(Sales),
-    Prophet = prophet(Sales ~ season(type = "multiplicative")),
+    # Prophet = prophet(Sales ~ season(type = "multiplicative")),
+    Prophet = prophet(Sales),
     # Redes_Neuronales = model(NNETAR(Sales))
   )
  %>%
@@ -1069,6 +1070,7 @@ df_cv %>%
 #   accuracy()
 )
 ```
+
 
 
 
