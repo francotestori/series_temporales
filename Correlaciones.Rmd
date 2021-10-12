@@ -1,10 +1,21 @@
 ---
 title: "R Notebook"
 output: html_notebook
+fig_width: 12
+fig_height: 4
+output:
+  html_document:
+    fig_width: 12
+    fig_height: 4
 ---
 
 # Leemos los df
 ```{r}
+library(ggplot2)
+pacman::p_load(forecast)
+dev.new(width=12, height=5)
+knitr::opts_chunk$set(fig.width=12, fig.height=5) 
+
 # install.packages('tidyverse')
 df_train = read.csv('data/train.csv')
 df_train$Date = as.Date(df_train$Date)
@@ -57,26 +68,40 @@ nrow(df_train_filtered[(df_train_filtered$DayOfWeek==7)&(df_train_filtered$Sales
 ```
 
 # Correlación cruzada con convolve de la ventas tienda 1, y clientes
-```{r}
-ventas_clientes = convolve(df_train_tienda_1$Sales, df_train_tienda_1$Customers, conj = TRUE)
-plot(df_train_tienda_1$Date, ventas_clientes , type="l")
+```{r fig.width=6, fig.height=4}
+df_train_tienda_1$ventas_clientes = convolve(df_train_tienda_1$Sales, df_train_tienda_1$Customers, conj = TRUE)
+
+ggplot(df_train_tienda_1, aes(x = Date, y = ventas_clientes)) +
+    geom_line(color="green", size = 1.2) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+    ggtitle("Cantidad de personas premium a lo largo de los últimos años")
 ```
+
 
 # Correlación cruzada Clientes Ventas
 ```{r}
-ccf(df_train_tienda_1$Customers, df_train_tienda_1$Sales,lag.max = 300)
+ggCcf(df_train_tienda_1$Customers, df_train_tienda_1$Sales,lag.max = 300)
 ```
-
-
 # Autocorrelación de la serie de ventas
 ```{r}
-acf(df_train_tienda_1$Sales, lag.max = length(df_train_tienda_1$Sales))
+ggAcf(df_train_tienda_1$Sales, lag.max = length(df_train_tienda_1$Sales))
 ```
 # Correlación cruzada tienda 1 y 3
 ```{r}
-plot(df_train_tienda_1$Date, df_train_tienda_1$Sales, type ='l' ,main= 'Ventas Tienda 1 y 3', xlab='Fecha', ylab='Ventas')
-lines(df_train_tienda_1$Date, df_train_tienda_3$Sales, col = 'red')
-ccf(df_train_tienda_1$Sales,df_train_tienda_3$Sales)
+
+ggplot(df_train_tienda_1, aes(x = Date, y = Sales)) +
+    geom_line(color="red", size = 1.2) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+    ggtitle("Ventas Tienda 1 y 3") +
+    xlab("Fecha") +
+    ylab("Ventas")
+```
+
+
+```{r}
+ggCcf(df_train_tienda_1$Sales,df_train_tienda_3$Sales)
 ```
 
 
@@ -93,7 +118,7 @@ y <- tsibble(
 )
 autoplot(y,Sales) +
   labs(title = "Ventas diarias Tienda 1",
-       y = "Sales")
+       y = "Ventas", x='Fecha')
 
 ```
 
