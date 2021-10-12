@@ -12,6 +12,7 @@ output:
 # Leemos los df
 ```{r}
 library(ggplot2)
+# install.packages('pacman')
 pacman::p_load(forecast)
 dev.new(width=12, height=5)
 knitr::opts_chunk$set(fig.width=12, fig.height=5) 
@@ -207,6 +208,14 @@ ggplot(melsyd_economy %>%
   geom_boxplot()
 ```
 # Cuando faltan pocos días para que termine el mes la venta es alta.
+
+# Día posterior a día cerrado
+```{r}
+ggplot(melsyd_economy %>%
+    mutate(Abierto_Dia_Anterior = as.factor(lag(Open))) %>%
+    filter(Open==1) ,  aes(x= Abierto_Dia_Anterior, y=Sales, color = Abierto_Dia_Anterior)) + 
+  geom_boxplot()
+```
 
 # Boxplots Efecto de vacaciones de escuela
 ```{r}
@@ -1085,7 +1094,7 @@ df_cv %>%
     # Redes_Neuronales = model(NNETAR(Sales))
   )
  %>%
-  forecast(h = 42) %>%
+  forecast(h =42) %>%
   accuracy(melsyd_economy_2 %>%
              filter(Open==1)) # Filtro sólo los días que estuvo abierto 
 # ,
@@ -1096,6 +1105,93 @@ df_cv %>%
 )
 ```
 
+# Moving Average 7 días antes
+
+# Create Training - Val Partitions para WFV
+```{r}
+# Time series cross-validation accuracy
+df_cv <- melsyd_economy_2 %>%
+    mutate(
+    Sales = slider::slide_dbl(Sales, mean,
+                .before = 6, .after = 0, .complete = FALSE)) %>%
+  slice(0:(n()-85)) %>%
+  stretch_tsibble(.init = 731, .step = 11) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  relocate(Date, .id)
 
 
+print(paste("Cantidad de folds: ", max(df_cv$.id)))
+df_cv
+```
+
+# Cross validation
+```{r}
+rbind(
+# TSCV accuracy
+df_cv %>%
+    model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales),
+    Drift = RW(Sales ~ drift()),
+    ETS = ETS(Sales),
+    # Prophet = prophet(Sales ~ season(type = "multiplicative")),
+    Prophet = prophet(Sales),
+    # Redes_Neuronales = model(NNETAR(Sales))
+  )
+ %>%
+  forecast(h =42) %>%
+  accuracy(melsyd_economy_2 %>%
+             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+# ,
+# # Training set accuracy
+# melsyd_economy_2 %>%
+#   model(RW(Sales ~ drift())) %>%
+#   accuracy()
+)
+```
+
+# Moving Average 28 días antes
+
+# Create Training - Val Partitions para WFV
+```{r}
+# Time series cross-validation accuracy
+df_cv <- melsyd_economy_2 %>%
+    mutate(
+    Sales = slider::slide_dbl(Sales, mean,
+                .before = 27, .after = 0, .complete = FALSE)) %>%
+  slice(0:(n()-85)) %>%
+  stretch_tsibble(.init = 731, .step = 11) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  relocate(Date, .id)
+
+
+print(paste("Cantidad de folds: ", max(df_cv$.id)))
+df_cv
+```
+
+# Cross validation
+```{r}
+rbind(
+# TSCV accuracy
+df_cv %>%
+    model(
+    Mean = MEAN(Sales),
+    `Naïve` = NAIVE(Sales),
+    `Seasonal naïve` = SNAIVE(Sales),
+    Drift = RW(Sales ~ drift()),
+    ETS = ETS(Sales),
+    # Prophet = prophet(Sales ~ season(type = "multiplicative")),
+    Prophet = prophet(Sales),
+    # Redes_Neuronales = model(NNETAR(Sales))
+  )
+ %>%
+  forecast(h =42) %>%
+  accuracy(melsyd_economy_2 %>%
+             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+# ,
+# # Training set accuracy
+# melsyd_economy_2 %>%
+#   model(RW(Sales ~ drift())) %>%
+#   accuracy()
+)
+```
 
