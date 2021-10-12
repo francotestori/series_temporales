@@ -3,10 +3,6 @@ title: "R Notebook"
 output: html_notebook
 fig_width: 12
 fig_height: 4
-output:
-  html_document:
-    fig_width: 12
-    fig_height: 4
 ---
 
 # Leemos los df
