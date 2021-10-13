@@ -213,6 +213,14 @@ ggplot(melsyd_economy %>%
   geom_boxplot()
 ```
 
+# Día posterior a día cerrado, excluyendo lunes, dado que todos los domingos se encuentra cerrado
+```{r}
+ggplot(melsyd_economy %>%
+    mutate(Abierto_Dia_Anterior = as.factor(lag(Open))) %>%
+    filter(Open==1, DayOfWeek!=1) ,  aes(x= Abierto_Dia_Anterior, y=Sales, color = Abierto_Dia_Anterior)) + 
+  geom_boxplot()
+```
+
 # Boxplots Efecto de vacaciones de escuela
 ```{r}
 ggplot(melsyd_economy %>%
@@ -816,8 +824,7 @@ fc_beer %>%
 
 # Métricas del modelo
 ```{r}
-accuracy(fc_beer, recent_production %>%
-           filter(Open==1) )
+accuracy(fc_beer, recent_production)
 ```
 
 
@@ -845,8 +852,7 @@ fc %>%
 
 # Métricas del modelo
 ```{r}
-accuracy(fc, recent_production %>%
-           filter(Open==1) )
+accuracy(fc, recent_production )
 ```
 
 # Modelos con tendencia y estacionalidad aditiva y multiplicativa
@@ -873,8 +879,7 @@ fc %>%
 # Métricas del modelo
 ```{r}
 accuracy(fc, recent_production %>%
-           mutate(Sales = Sales/1e3) %>%
-           filter(Open==1) )
+           mutate(Sales = Sales)  )
 ```
 
 # Efecto Multiplicativo
@@ -1066,7 +1071,7 @@ melsyd_economy_2 %>%
 # Time series cross-validation accuracy
 df_cv <- melsyd_economy_2 %>%
   slice(0:(n()-85)) %>%
-  stretch_tsibble(.init = 731, .step = 11) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  stretch_tsibble(.init = 731, .step = 42) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
   relocate(Date, .id)
 
 
@@ -1091,8 +1096,7 @@ df_cv %>%
   )
  %>%
   forecast(h =42) %>%
-  accuracy(melsyd_economy_2 %>%
-             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+  accuracy(melsyd_economy_2) # Filtro sólo los días que estuvo abierto 
 # ,
 # # Training set accuracy
 # melsyd_economy_2 %>%
@@ -1111,7 +1115,7 @@ df_cv <- melsyd_economy_2 %>%
     Sales = slider::slide_dbl(Sales, mean,
                 .before = 6, .after = 0, .complete = FALSE)) %>%
   slice(0:(n()-85)) %>%
-  stretch_tsibble(.init = 731, .step = 11) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
+  stretch_tsibble(.init = 731, .step = 42) %>% # Toma al menos los primeros dos años y va tomando de a 6 semanas para testear
   relocate(Date, .id)
 
 
@@ -1136,8 +1140,7 @@ df_cv %>%
   )
  %>%
   forecast(h =42) %>%
-  accuracy(melsyd_economy_2 %>%
-             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+  accuracy(melsyd_economy_2 ) # Filtro sólo los días que estuvo abierto 
 # ,
 # # Training set accuracy
 # melsyd_economy_2 %>%
@@ -1180,9 +1183,8 @@ df_cv %>%
     # Redes_Neuronales = model(NNETAR(Sales))
   )
  %>%
-  forecast(h =42) %>%
-  accuracy(melsyd_economy_2 %>%
-             filter(Open==1)) # Filtro sólo los días que estuvo abierto 
+  forecast(h = 42) %>%
+  accuracy(melsyd_economy_2 ) # Filtro sólo los días que estuvo abierto 
 # ,
 # # Training set accuracy
 # melsyd_economy_2 %>%
@@ -1190,4 +1192,49 @@ df_cv %>%
 #   accuracy()
 )
 ```
+
+# Resultados en TEST (los últimos 42 días)
+
+
+```{r}
+melsyd_economy_2 %>%
+  slice(0:(n()-42)) %>%
+    model(
+      Prophet = prophet(Sales)
+    )%>%
+  forecast(h = 42) %>%
+  accuracy(melsyd_economy_2)
+```
+
+# Gráfico en Test
+```{r}
+melsyd_economy_2 %>%
+  slice(0:(n()-42)) %>%
+  # filter(Open==1) %>%
+    model(
+      Prophet = prophet(Sales)
+    )%>%
+  forecast(h = 42) %>%
+  autoplot(melsyd_economy_2 %>%
+             # filter(Open==1) %>%
+                  slice(n()-134:0)) +
+  labs(title = "Ventas últimas 18 semanas y predicciones con Prophet")
+```
+
+# Descomposición Prophet
+```{r}
+fit <- melsyd_economy_2 %>%
+  slice(0:(n()-42)) %>%
+  model(
+    prophet(Sales) ) 
+fit %>%
+  components() %>%
+  autoplot()
+```
+
+# Análisis de residuos
+```{r}
+fit %>% gg_tsresiduals()
+```
+
 
