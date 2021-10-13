@@ -72,7 +72,7 @@ ggplot(df_train_tienda_1, aes(x = Date, y = ventas_clientes)) +
     geom_line(color="green", size = 1.2) +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
-    ggtitle("Cantidad de personas premium a lo largo de los últimos años")
+    ggtitle("Cantidad de ventas a lo largo de los últimos años")
 ```
 
 
@@ -91,7 +91,7 @@ ggplot(df_train_tienda_1, aes(x = Date, y = Sales)) +
     geom_line(color="red", size = 1.2) +
     theme_minimal() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
-    ggtitle("Ventas Tienda 1 y 3") +
+    ggtitle("Ventas Tienda 1") +
     xlab("Fecha") +
     ylab("Ventas")
 ```
@@ -126,7 +126,7 @@ melsyd_economy <- df_train_filtered %>%
   as_tsibble(index = Date)
 
 autoplot(melsyd_economy, Sales) +
-  labs(title = "Sales")
+  labs(title = "Ventas - Domingos y feriados filtrados")
 ```
 
 ```{r}
@@ -160,7 +160,9 @@ melsyd_economy %>% gg_season(Sales, period = "week") +
 ggplot(melsyd_economy %>%
   filter(Open==1) %>%
     mutate(DayOfWeek = as.factor(DayOfWeek)),  aes(x= DayOfWeek, y=Sales, color = DayOfWeek)) + 
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "Ventas diarias Tienda 1",
+       y = "Ventas", x='Día de la semana')
 ```
 # La mediana y los extramos de la caja se comportan de manera distinta dependiendo el día de la semana
 
@@ -175,8 +177,8 @@ melsyd_economy %>% gg_season(Sales, period = "year") +
 ```{r}
 melsyd_economy %>%
   gg_subseries(Sales,period = 'week') +
-  labs(title = "Venta por día de la semana"
-  )
+  labs(title = "Ventas por día de la semana en Tienda 1",
+       y = "Ventas", x='Día de la semana')
 ```
 
 
@@ -184,8 +186,8 @@ melsyd_economy %>%
 ```{r}
 melsyd_economy %>%
   gg_subseries(Sales,period = 'month') +
-  labs(title = "Venta por día del mes"
-  )
+  labs(title = "Ventas por día del mes en Tienda 1",
+       y = "Ventas", x='Día del mes')
 ```
 
 # Boxplot Estacionalidad a lo largo del mes
@@ -193,7 +195,9 @@ melsyd_economy %>%
 ggplot(melsyd_economy %>%
   filter(Open==1) %>%
     mutate(DayOfMonth = as.factor(lubridate::day(Date))),  aes(x= DayOfMonth, y=Sales, color = DayOfMonth)) + 
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "Ventas por día del mes para la Tienda 1",
+       y = "Ventas", x='Día del mes')
 ```
 
 # Días para que termine el mes
@@ -210,7 +214,9 @@ ggplot(melsyd_economy %>%
 ggplot(melsyd_economy %>%
     mutate(Abierto_Dia_Anterior = as.factor(lag(Open))) %>%
     filter(Open==1) ,  aes(x= Abierto_Dia_Anterior, y=Sales, color = Abierto_Dia_Anterior)) + 
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "Ventas diarias Tienda 1",
+       y = "Ventas", x='Se encontraba abierto el día anterior?')
 ```
 
 # Día posterior a día cerrado, excluyendo lunes, dado que todos los domingos se encuentra cerrado
@@ -220,22 +226,22 @@ ggplot(melsyd_economy %>%
     filter(Open==1, DayOfWeek!=1) ,  aes(x= Abierto_Dia_Anterior, y=Sales, color = Abierto_Dia_Anterior)) + 
   geom_boxplot()
 ```
-
 # Boxplots Efecto de vacaciones de escuela
 ```{r}
 ggplot(melsyd_economy %>%
   filter(Open==1) %>%
     mutate(SchoolHoliday = as.factor(SchoolHoliday)),  aes(x= SchoolHoliday, y=Sales, color = SchoolHoliday)) + 
-  geom_boxplot()
+  geom_boxplot()+
+  labs(title = "Ventas diarias Tienda 1",
+       y = "Ventas", x='Ese día es vacaciones escolares?')
 ```
 # La mediana parece ser más baja, no obstante hay mucho solapamiento
 
 ```{r}
 melsyd_economy %>%
   autoplot(Customers) +
-  labs(
-    title = "Clientes"
-  )
+  labs(title = "Clientes diarios Tienda 1",
+       y = "Clientes", x='Fecha')
 ```
 
 # Scatter Plot Clientes y Ventas
@@ -324,8 +330,8 @@ components(dcmp) %>%
   as_tsibble() %>%
   autoplot(Sales, colour = "gray") +
   geom_line(aes(y=season_adjust), colour = "#0072B2") +
-  labs(
-       title = "Sales")
+  labs(title = "Ventas diarias Tienda 1 <estacionalidad ajustada>",
+       y = "Ventas", x='Fecha')
 ```
 
 
@@ -341,8 +347,8 @@ melsyd_economy_3 <- melsyd_economy_2 %>%
 melsyd_economy_3 %>%
   autoplot(Sales) +
   geom_line(aes(y = `7-MA`), colour = "#D55E00") +
-  labs(y = "% of GDP",
-       title = "Total Australian exports") +
+  labs(y = "Ventas",
+       title = "Ventas diarias Tienda 1") +
   guides(colour = guide_legend(title = "series"))
 
 
@@ -357,8 +363,8 @@ melsyd_economy_3 <- melsyd_economy %>%
 melsyd_economy_3 %>%
   autoplot(Sales) +
   geom_line(aes(y = `7-MA`), colour = "#D55E00") +
-  labs(y = "% of GDP",
-       title = "Total Australian exports") +
+  labs(y = "Ventas",
+       title = "Ventas diarias Tienda 1") +
   guides(colour = guide_legend(title = "series"))
 
 ```
@@ -376,8 +382,8 @@ melsyd_economy_4 <- melsyd_economy_2 %>%
 melsyd_economy_4 %>%
   autoplot(Sales, colour = "gray") +
   geom_line(aes(y = `2x12-MA`), colour = "#D55E00") +
-  labs(y = "Persons (thousands)",
-       title = "Total employment in US retail")
+  labs(y = "Ventas",
+       title = "Ventas diarias Tienda 1 <tendencia como suma de dos filtros MA>")
 ```
 
 # Descomposición clásica
@@ -389,8 +395,7 @@ melsyd_economy_2 %>%
   ) %>%
   components() %>%
   autoplot() +
-  labs(title = "Classical additive decomposition of total
-                  US retail employment")
+  labs(title = "Descomposición lineal aditiva para las ventas Tienda 1")
 ```
 
 # Descomposiciones clásicas
@@ -416,7 +421,8 @@ melsyd_economy_2 %>%
                    season(window = "periodic"),
     robust = TRUE)) %>%
   components() %>%
-  autoplot()
+  autoplot()+
+  labs(title = "Descomposición STL para las ventas Tienda 1")
 ```
 # STL Features
 ```{r}
@@ -486,7 +492,7 @@ beer_fc %>%
     colour = "black"
   ) +
   labs(
-    title = "Forecasts for Sales"
+    title = "Forecasts para las ventas Tienda 1"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
@@ -519,7 +525,7 @@ beer_fc %>%
     colour = "black"
   ) +
   labs(
-    title = "Forecasts for Sales"
+    title = "Forecasts para las ventas Tienda 1"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
@@ -553,7 +559,7 @@ beer_fc %>%
     colour = "black"
   ) +
   labs(
-    title = "Forecasts for Sales"
+    title = "Forecasts para las ventas Tienda 1"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
@@ -593,7 +599,7 @@ beer_fc %>%
     colour = "black"
   ) +
   labs(
-    title = "Forecasts for Sales"
+    title = "Forecasts para las ventas Tienda 1"
   ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
@@ -620,7 +626,7 @@ aug <- df_train_tienda_1 %>%
   model(SNAIVE(Sales ~ lag("week"))) %>%
   augment()
 autoplot(aug, .innov) +
-  labs(title = "Residuals from the naïve method")
+  labs(title = "Residuos del método naïve")
 ```
 
 # Histograma Residuos
@@ -628,7 +634,7 @@ autoplot(aug, .innov) +
 aug %>%
   ggplot(aes(x = .innov)) +
   geom_histogram() +
-  labs(title = "Histogram of residuals")
+  labs(title = "Histograma de los residuos")
 ```
 
 # Autocorrelacion de los residuos
@@ -636,7 +642,7 @@ aug %>%
 aug %>%
   ACF(.innov) %>%
   autoplot() +
-  labs(title = "Residuals from the naïve method")
+  labs(title = "Residuos del método naïve")
 ```
 # Se pueden ver algunas autocorrelaciones altas.
 
@@ -653,7 +659,7 @@ df_train_tienda_1 %>%
   model(SNAIVE(Sales ~ lag("week"))) %>%
   forecast(h = 42) %>%
   autoplot(df_train_tienda_1) +
-  labs(title="Google daily closing stock price", y="$US" )
+  labs(title="Forecast de Ventas <intervalos de predicción SNAIVE>", y="$US" )
 ```
 
 # Intervalos de predicción
@@ -662,7 +668,7 @@ melsyd_economy %>%
   model(SNAIVE(Sales ~ lag("week"))) %>%
   forecast(h = 42) %>%
   autoplot(melsyd_economy) +
-  labs(title="Google daily closing stock price", y="$US" )
+  labs(title="Forecast de ventas <Intervalos de predicción SNAIVE>", y="Ventas" )
 ```
 
 # Intervalos de predicción
@@ -671,7 +677,7 @@ melsyd_economy %>%
   model(NAIVE(Sales)) %>%
   forecast(h = 42) %>%
   autoplot(melsyd_economy) +
-  labs(title="Google daily closing stock price", y="$US" )
+  labs(title="Forecast de ventas <Intervalos de predicción SNAIVE>", y="Ventas" )
 ```
 
 # Forecast for the last 42 days (6 weeks)
@@ -697,10 +703,7 @@ beer_fc %>%
     melsyd_economy %>% slice(n()-134:0),
     level = NULL
   ) +
-  labs(
-    y = "Megalitres",
-    title = "Forecasts for quarterly beer production"
-  ) +
+  labs(title="Forecast de ventas", y="Ventas" ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
 
@@ -733,10 +736,7 @@ beer_fc %>%
     melsyd_economy_2 %>% slice(n()-134:0),
     level = NULL
   ) +
-  labs(
-    y = "Megalitres",
-    title = "Forecasts for quarterly beer production"
-  ) +
+  labs(title="Forecast de ventas", y="Ventas" ) +
   guides(colour = guide_legend(title = "Forecast"))
 ```
 
@@ -818,13 +818,14 @@ fc_beer <- forecast(fit_beer, new_data = recent_production)
 fc_beer %>%
   autoplot(recent_production) +
   labs(
-    title = "Sales Forecast using regression"
+    title = "Forecast de ventas usando regresión"
   )
 ```
 
 # Métricas del modelo
 ```{r}
 accuracy(fc_beer, recent_production)
+
 ```
 
 
@@ -853,6 +854,7 @@ fc %>%
 # Métricas del modelo
 ```{r}
 accuracy(fc, recent_production )
+
 ```
 
 # Modelos con tendencia y estacionalidad aditiva y multiplicativa
@@ -872,7 +874,7 @@ fc <- fit %>% forecast(h = 42)
 fc %>%
   autoplot(aus_holidays %>%
            slice(n()-126:0), level = NULL) +
-  labs(title="Sales, Holts Winters - Additive and Multiplicative") +
+  labs(title="Sales <Estacionalidad Holts Winters> - Additive and Multiplicative") +
   guides(colour = guide_legend(title = "Forecast"))
 ```
 
@@ -894,7 +896,7 @@ sth_cross_ped %>%
   ) %>%
   forecast(h = 42) %>%
   autoplot(sth_cross_ped %>% slice(n()-126:0)) +
-  labs(title = "Sales Holts - Winters Multiplicativo")
+  labs(title = "Estacionalidad Holts - Winters Multiplicativo")
 ```
 
 # Descomposición del modelo Holts-Winters en Nivel, Tendencia, Estacionalidad
